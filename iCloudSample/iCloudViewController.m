@@ -25,15 +25,9 @@
 	}];
     self.document = nil;
 	
-	dispatch_queue_t queue = 
-	dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-	
-	dispatch_async(queue, ^{
 	[self.managedDocument closeWithCompletionHandler:^(BOOL success) {
 		NSLog(@"close");
 	}];
-	});
-	
 	self.managedDocument = nil; 
 }
 
@@ -96,39 +90,23 @@
 		NSLog(@"%d", [data length]);
 		
 		NSLog(@"%@", [NSString stringWithUTF8String:[data bytes]]);
-				
-//		NSLog(@"only found booklist");		
-//		NSMetadataItem *item = [query resultAtIndex:0];
-//        NSURL *url = [item valueForAttribute:NSMetadataItemURLKey];
-//        
-//        self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:url] autorelease];
-//		
-//		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:@"com.sonson.booklist", NSPersistentStoreUbiquitousContentNameKey,
-//		 url, NSPersistentStoreUbiquitousContentURLKey,
-//		 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
-//		 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
-//		 nil];
-//		self.managedDocument.persistentStoreOptions = options;
-//		
-//        [self.managedDocument openWithCompletionHandler:^(BOOL success) {
-//            if (success) {
-//                NSLog(@"existing document opened from iCloud");
-//				[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
-//            } else {
-//                NSLog(@"existing document failed to open from iCloud");
-//            }
-//        }];
-	}
-	else {
-		NSLog(@"can't find text.txt from iCloud");
 		
-		NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
-		NSURL *ubiquitousURL = [[ubiq URLByAppendingPathComponent:@"Documents"] URLByAppendingPathComponent:@"booklist"];
-        
-        self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:ubiquitousURL] autorelease];
+		NSString *error;
+		NSPropertyListFormat format;
+		NSDictionary* plist = [NSPropertyListSerialization propertyListFromData:data mutabilityOption:NSPropertyListImmutable format:&format errorDescription:&error];
+		NSLog( @"plist is %@", plist );
+		if(!plist){
+			NSLog(@"Error: %@",error);
+			[error release];
+		}
 		
-		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:@"com.sonson.booklist", NSPersistentStoreUbiquitousContentNameKey,
-								 ubiquitousURL,														NSPersistentStoreUbiquitousContentURLKey,
+		NSString *key = [plist objectForKey:@"NSPersistentStoreUbiquitousContentNameKey"];
+		NSURL *ubiURL = [url URLByDeletingLastPathComponent];
+		
+        self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:ubiURL] autorelease];
+		
+		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:key,	NSPersistentStoreUbiquitousContentNameKey,
+								 ubiURL,									NSPersistentStoreUbiquitousContentURLKey,
 								 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
 								 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
 								 nil];
@@ -137,12 +115,83 @@
 		dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 		
 		dispatch_async(queue, ^{
-        [self.managedDocument saveToURL:ubiquitousURL forSaveOperation:UIDocumentSaveForCreating completionHandler:^(BOOL success) {
-            NSLog(@"new document save to iCloud");
-            [self.managedDocument openWithCompletionHandler:^(BOOL success) {
-                NSLog(@"new document opened from iCloud");
-				[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
-            }];
+			[self.managedDocument openWithCompletionHandler:^(BOOL success) {
+				if (success) {
+					NSLog(@"Open");
+					[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
+				}
+			}];
+		});
+	}
+	else {
+		NSLog(@"can't find DocumentMetadata from iCloud");
+		
+		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+		NSString *documentsDirectory = [paths objectAtIndex:0];
+		
+		NSURL *localURL = [NSURL fileURLWithPath:[documentsDirectory stringByAppendingPathComponent:@"booklist3"]];
+		
+		NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
+        NSURL *ubiquitousURL = [[ubiq URLByAppendingPathComponent:@"Documents"] URLByAppendingPathComponent:@"booklist3"];
+        
+        self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:localURL] autorelease];
+		
+		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:@"com.sonson.booklist",	NSPersistentStoreUbiquitousContentNameKey,
+								 ubiq,																NSPersistentStoreUbiquitousContentURLKey,
+								 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
+								 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
+								 nil];
+		self.managedDocument.persistentStoreOptions = options;
+		dispatch_queue_t queue = 
+		dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+		
+		
+		dispatch_async(queue, ^{
+        [self.managedDocument saveToURL:localURL forSaveOperation:UIDocumentSaveForCreating completionHandler:^(BOOL success) {
+			if (success) {
+				NSLog(@"Save");
+				[self.managedDocument openWithCompletionHandler:^(BOOL success) {
+					if (success) {
+					//	NSLog(@"Open");
+					//	[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
+					}
+				}];
+				
+				NSError *error = nil;
+				[[NSFileManager defaultManager] 
+				 setUbiquitous:YES
+				 itemAtURL:localURL
+				 destinationURL:ubiquitousURL
+				 error:&error];
+				NSLog(@"Error=%@", [error localizedDescription]);
+				
+				self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:ubiquitousURL] autorelease];
+				
+				NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:@"com.sonson.booklist",	NSPersistentStoreUbiquitousContentNameKey,
+										 ubiq,																NSPersistentStoreUbiquitousContentURLKey,
+										 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
+										 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
+										 nil];
+				self.managedDocument.persistentStoreOptions = options;
+				[self.managedDocument openWithCompletionHandler:^(BOOL success) {
+					if (success) {
+						NSLog(@"Open");
+						[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
+					}
+				}];
+//				dispatch_queue_t queue = 
+//				dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+//				
+//				dispatch_async(queue, ^{
+//					NSError *error = nil;
+//					[[NSFileManager defaultManager] 
+//					 setUbiquitous:YES
+//					 itemAtURL:localURL
+//					 destinationURL:ubiquitousURL
+//					 error:&error];
+//					NSLog(@"%@", [error localizedDescription]);
+//				});
+			}
         }];
 		});
 	}
