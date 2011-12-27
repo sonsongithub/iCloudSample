@@ -13,7 +13,7 @@
 @synthesize text = _text;
 
 - (void)dealloc {
-	NSLog(@"dealloc");
+	NSLog(@"MyDocument - dealloc");
     self.text = nil;
     [super dealloc];
 }

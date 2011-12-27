@@ -46,6 +46,9 @@
 #pragma mark - View lifecycle
 
 - (void)reloadDatabase {
+	if (self.managedDocument == nil)
+		return;
+	
 	NSFetchRequest *request = [[NSFetchRequest alloc] init];
 	NSEntityDescription *entity = [NSEntityDescription entityForName:@"BookInfo" inManagedObjectContext:self.managedDocument.managedObjectContext];
 	[request setEntity:entity];
