@@ -15,7 +15,7 @@
 #import "TextViewController.h"
 #import "BookListViewController.h"
 
-#define UBIQUITOUS_TEXT_FILE_NAME		@"text111.txt"
+#define UBIQUITOUS_TEXT_FILE_NAME		@"text.txt"
 #define UBIQUITOUS_DATABASE_FILE_NAME	@"database"
 
 @implementation iCloudViewController
@@ -42,6 +42,13 @@
 	NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
 	NSURL *ubiquitousURL = [[ubiq URLByAppendingPathComponent:@"Documents"] URLByAppendingPathComponent:UBIQUITOUS_TEXT_FILE_NAME];
 	return ubiquitousURL;
+}
+
+- (NSURL*)databaseFileLocalURL {
+	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+	NSString *documentsDirectory = [paths objectAtIndex:0];
+	NSURL *localURL = [[NSURL fileURLWithPath:documentsDirectory] URLByAppendingPathComponent:UBIQUITOUS_DATABASE_FILE_NAME];
+	return localURL;
 }
 
 - (NSURL*)databaseFileUbiquitousURL {
@@ -103,45 +110,43 @@
     [query stopQuery];
 	
 	if (query.resultCount == 1) {
-		NSLog(@"DocumentMetadata");
-		
+		NSLog(@"Found DocumentMetadata.plist.");		
 		NSMetadataItem *item = [query resultAtIndex:0];
         NSURL *url = [item valueForAttribute:NSMetadataItemURLKey];
+		
 		NSLog(@"%@", url);
 		
 		NSData *data = [NSData dataWithContentsOfURL:url];
+		NSString *errorDescription = nil;
+		NSPropertyListFormat format = 0;
+		NSDictionary* plist = [NSPropertyListSerialization propertyListFromData:data mutabilityOption:NSPropertyListImmutable format:&format errorDescription:&errorDescription];
 		
-		NSLog(@"%d", [data length]);
-		
-		NSLog(@"%@", [NSString stringWithUTF8String:[data bytes]]);
-		
-		NSString *error;
-		NSPropertyListFormat format;
-		NSDictionary* plist = [NSPropertyListSerialization propertyListFromData:data mutabilityOption:NSPropertyListImmutable format:&format errorDescription:&error];
-		NSLog( @"plist is %@", plist );
-		if(!plist){
-			NSLog(@"Error: %@",error);
-			[error release];
+		if(!plist) {
+			NSLog(@"Error: %@", errorDescription);
+			return;
 		}
 		
 		NSString *key = [plist objectForKey:@"NSPersistentStoreUbiquitousContentNameKey"];
-		NSURL *ubiURL = [url URLByDeletingLastPathComponent];
+		NSURL *databaseFileUbiquitousURL = [url URLByDeletingLastPathComponent];
 		
-        self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:ubiURL] autorelease];
+		NSLog(@"%@", key);
+		NSLog(@"%@", databaseFileUbiquitousURL);
 		
-		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:key,	NSPersistentStoreUbiquitousContentNameKey,
-								 ubiURL,									NSPersistentStoreUbiquitousContentURLKey,
+		self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:databaseFileUbiquitousURL] autorelease];
+		
+		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
+								 key,							NSPersistentStoreUbiquitousContentNameKey,
+								 databaseFileUbiquitousURL,		NSPersistentStoreUbiquitousContentURLKey,
 								 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
 								 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
 								 nil];
 		self.managedDocument.persistentStoreOptions = options;
-		dispatch_queue_t queue = 
-		dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-		
+		dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+
 		dispatch_async(queue, ^{
 			[self.managedDocument openWithCompletionHandler:^(BOOL success) {
 				if (success) {
-					NSLog(@"Open");
+					NSLog(@"Open existing CoreData file from iCloud.");
 					[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
 				}
 			}];
@@ -149,74 +154,77 @@
 	}
 	else {
 		NSLog(@"can't find DocumentMetadata from iCloud");
+		NSURL *localURL = [self databaseFileLocalURL];
+		NSURL *databaseFileUbiquitousURL = [self databaseFileUbiquitousURL];
+		MyManagedDocument *tempMyManagedDocument = [[MyManagedDocument alloc] initWithFileURL:localURL];
 		
-		NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-		NSString *documentsDirectory = [paths objectAtIndex:0];
-		
-		NSURL *localURL = [NSURL fileURLWithPath:[documentsDirectory stringByAppendingPathComponent:@"booklist3"]];
-		
-		NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
-        NSURL *ubiquitousURL = [[ubiq URLByAppendingPathComponent:@"Documents"] URLByAppendingPathComponent:@"booklist3"];
-        
-        self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:localURL] autorelease];
-		
-		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:@"com.sonson.booklist",	NSPersistentStoreUbiquitousContentNameKey,
-								 ubiq,																NSPersistentStoreUbiquitousContentURLKey,
+		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
 								 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
 								 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
 								 nil];
-		self.managedDocument.persistentStoreOptions = options;
-		dispatch_queue_t queue = 
-		dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+		tempMyManagedDocument.persistentStoreOptions = options;
 		
-		
+		dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
 		dispatch_async(queue, ^{
-        [self.managedDocument saveToURL:localURL forSaveOperation:UIDocumentSaveForCreating completionHandler:^(BOOL success) {
-			if (success) {
-				NSLog(@"Save");
-				[self.managedDocument openWithCompletionHandler:^(BOOL success) {
-					if (success) {
-					//	NSLog(@"Open");
-					//	[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
+			[tempMyManagedDocument saveToURL:localURL forSaveOperation:UIDocumentSaveForCreating completionHandler:^(BOOL success) {
+				if (success) {
+					NSLog(@"Save on local storage");
+					
+					// copy to iCloud storage
+					NSError *error = nil;
+					if ([[NSFileManager defaultManager] setUbiquitous:YES itemAtURL:localURL destinationURL:databaseFileUbiquitousURL error:&error]) {
+						NSLog(@"Copy to iCloud storage");
 					}
-				}];
-				
-				NSError *error = nil;
-				[[NSFileManager defaultManager] 
-				 setUbiquitous:YES
-				 itemAtURL:localURL
-				 destinationURL:ubiquitousURL
-				 error:&error];
-				NSLog(@"Error=%@", [error localizedDescription]);
-				
-				self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:ubiquitousURL] autorelease];
-				
-				NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:@"com.sonson.booklist",	NSPersistentStoreUbiquitousContentNameKey,
-										 ubiq,																NSPersistentStoreUbiquitousContentURLKey,
-										 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
-										 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
-										 nil];
-				self.managedDocument.persistentStoreOptions = options;
-				[self.managedDocument openWithCompletionHandler:^(BOOL success) {
-					if (success) {
-						NSLog(@"Open");
-						[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
+					else {
+						NSLog(@"Can't copy to iCloud, error=%@", [error localizedDescription]);
+						if ([[NSFileManager defaultManager] removeItemAtURL:databaseFileUbiquitousURL error:&error]) {
+						}
+						else {
+							NSLog(@"Error=%@", [error localizedDescription]);
+						}
+						[tempMyManagedDocument closeWithCompletionHandler:^(BOOL success) {
+							if (success)
+								NSLog(@"close local CoreData document.");
+							else
+								NSLog(@"Error, can't close local CoreData document.");
+							[tempMyManagedDocument autorelease];
+						}];
+						return;
 					}
-				}];
-//				dispatch_queue_t queue = 
-//				dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-//				
-//				dispatch_async(queue, ^{
-//					NSError *error = nil;
-//					[[NSFileManager defaultManager] 
-//					 setUbiquitous:YES
-//					 itemAtURL:localURL
-//					 destinationURL:ubiquitousURL
-//					 error:&error];
-//					NSLog(@"%@", [error localizedDescription]);
-//				});
-			}
-        }];
+					
+					[tempMyManagedDocument closeWithCompletionHandler:^(BOOL success) {
+						if (success)
+							NSLog(@"close local CoreData document.");
+						else
+							NSLog(@"Error, can't close local CoreData document.");
+						[tempMyManagedDocument autorelease];
+					}];
+					
+					self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:databaseFileUbiquitousURL] autorelease];
+					
+					NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
+											 @"com.sonson.booklist",		NSPersistentStoreUbiquitousContentNameKey,
+											 databaseFileUbiquitousURL,		NSPersistentStoreUbiquitousContentURLKey,
+											 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
+											 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
+											 nil];
+					self.managedDocument.persistentStoreOptions = options;
+					[self.managedDocument openWithCompletionHandler:^(BOOL success) {
+						if (success) {
+							NSLog(@"Open new CoreData file from iCloud.");
+							[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
+						}
+						else {
+							NSLog(@"Error, can't open CoreData file from iCloud.");
+						}
+					}];
+				}
+				else {
+					NSLog(@"Error, can't save on local storage");
+					[[NSFileManager defaultManager] removeItemAtURL:localURL error:nil];
+					[tempMyManagedDocument autorelease];
+				}
+			}];
 		});
 	}
 	[[NSNotificationCenter defaultCenter] removeObserver:self name:NSMetadataQueryDidFinishGatheringNotification object:query];
@@ -272,7 +280,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
 	[self openDocument];
-	//[self openManagedDocument];
+	[self openManagedDocument];
 }
 
 - (void)viewDidUnload {
