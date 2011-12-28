@@ -53,15 +53,11 @@
 	NSEntityDescription *entity = [NSEntityDescription entityForName:@"BookInfo" inManagedObjectContext:self.managedDocument.managedObjectContext];
 	[request setEntity:entity];
 	
-	
-//	NSSortDescriptor *sortDescriptor = [[NSSortDescriptor alloc]
-//										initWithKey:@"price" ascending:NO];
-//	NSArray *sortDescriptors = [[NSArray alloc] initWithObjects:sortDescriptor,
-//								nil];
+//	NSSortDescriptor *sortDescriptor = [[NSSortDescriptor alloc] initWithKey:@"price" ascending:NO];
+//	NSArray *sortDescriptors = [[NSArray alloc] initWithObjects:sortDescriptor, nil];
 //	[request setSortDescriptors:sortDescriptors];
 //	[sortDescriptors release];
 //	[sortDescriptor release];
-	
 	
 	NSError *error = nil;
 	NSMutableArray *mutableFetchResults = [[self.managedDocument.managedObjectContext executeFetchRequest:request error:&error] mutableCopy];
@@ -85,11 +81,10 @@
 	}
 }
 
-- (void)viewDidLoad
-{
+- (void)viewDidLoad {
     [super viewDidLoad];
 	self.array = [NSMutableArray array];
-	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:@"didUpdateMyManagedDocument" object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:kDidUpdateMyManagedDocumentNotification object:nil];
 	[self reloadDatabase];
 }
 
@@ -101,36 +96,18 @@
 	}
 }
 
-- (void)viewDidUnload
-{
+- (void)viewDidUnload {
     [super viewDidUnload];
     // Release any retained subviews of the main view.
     // e.g. self.myOutlet = nil;
 }
 
-- (void)viewWillAppear:(BOOL)animated
-{
+- (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
 	[self reloadDatabase];
 }
 
-- (void)viewDidAppear:(BOOL)animated
-{
-    [super viewDidAppear:animated];
-}
-
-- (void)viewWillDisappear:(BOOL)animated
-{
-    [super viewWillDisappear:animated];
-}
-
-- (void)viewDidDisappear:(BOOL)animated
-{
-    [super viewDidDisappear:animated];
-}
-
-- (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
-{
+- (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
     // Return YES for supported orientations
     return (interfaceOrientation == UIInterfaceOrientationPortrait);
 }
@@ -145,8 +122,7 @@
     return [self.array count];
 }
 
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
-{
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     static NSString *CellIdentifier = @"normal";
     
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:CellIdentifier];

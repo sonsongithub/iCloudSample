@@ -31,7 +31,7 @@
 
 - (void)viewDidLoad {
 	[super viewDidLoad];
-	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyDocument:) name:@"didUpdateMyDocument" object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyDocument:) name:kDidUpdateMyDocumentNotification object:nil];
 	self.textView.text = self.document.text;
 }
 
