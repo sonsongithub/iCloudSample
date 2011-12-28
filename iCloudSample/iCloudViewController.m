@@ -15,6 +15,9 @@
 #import "TextViewController.h"
 #import "BookListViewController.h"
 
+#define UBIQUITOUS_TEXT_FILE_NAME		@"text111.txt"
+#define UBIQUITOUS_DATABASE_FILE_NAME	@"database"
+
 @implementation iCloudViewController
 
 @synthesize document = _document;
@@ -31,13 +34,31 @@
 	self.managedDocument = nil; 
 }
 
+- (NSURL*)containerUbiquitousURL {
+	return [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
+}
+
+- (NSURL*)documentFileUbiquitousURL {
+	NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
+	NSURL *ubiquitousURL = [[ubiq URLByAppendingPathComponent:@"Documents"] URLByAppendingPathComponent:UBIQUITOUS_TEXT_FILE_NAME];
+	return ubiquitousURL;
+}
+
+- (NSURL*)databaseFileUbiquitousURL {
+	NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
+	NSURL *ubiquitousURL = [[ubiq URLByAppendingPathComponent:@"Documents"] URLByAppendingPathComponent:UBIQUITOUS_DATABASE_FILE_NAME];
+	return ubiquitousURL;
+}
+
+#pragma mark - Notification handler
+
 - (void)queryDidFinishGatheringForDocument:(NSNotification *)notification {
     NSMetadataQuery *query = [notification object];
     [query disableUpdates];
     [query stopQuery];
 	
 	if (query.resultCount == 1) {
-		NSLog(@"only found text.txt");
+		NSLog(@"found a document from iCloud");
 		
 		NSMetadataItem *item = [query resultAtIndex:0];
         NSURL *url = [item valueForAttribute:NSMetadataItemURLKey];
@@ -47,7 +68,7 @@
         [self.document openWithCompletionHandler:^(BOOL success) {
             if (success) {
                 NSLog(@"existing document opened from iCloud");
-				[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyDocument" object:nil userInfo:nil];
+				[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyDocumentNotification object:nil userInfo:nil];
             } else {
                 NSLog(@"existing document failed to open from iCloud");
             }
@@ -55,18 +76,21 @@
 	}
 	
 	else {
-		NSLog(@"can't find text.txt from iCloud");
-        NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
-        NSURL *ubiquitousURL = [[ubiq URLByAppendingPathComponent:@"Documents"] URLByAppendingPathComponent:@"text.txt"];
+		NSLog(@"can't find a document from iCloud");
+        NSURL *ubiquitousURL = [self documentFileUbiquitousURL];
         
 		self.document = [[[MyDocument alloc] initWithFileURL:ubiquitousURL] autorelease];
 		
         [self.document saveToURL:[self.document fileURL] forSaveOperation:UIDocumentSaveForCreating completionHandler:^(BOOL success) {
-            NSLog(@"new document save to iCloud");
-            [self.document openWithCompletionHandler:^(BOOL success) {
-                NSLog(@"new document opened from iCloud");
-				[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyDocument" object:nil userInfo:nil];
-            }];
+			if (success) {
+				NSLog(@"new document save to iCloud");
+				[self.document openWithCompletionHandler:^(BOOL success) {
+					if (success) {
+						NSLog(@"new document opened from iCloud");
+						[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyDocumentNotification object:nil userInfo:nil];
+					}
+				}];
+			}
         }];
 	}
 	[[NSNotificationCenter defaultCenter] removeObserver:self name:NSMetadataQueryDidFinishGatheringNotification object:query];
@@ -118,7 +142,7 @@
 			[self.managedDocument openWithCompletionHandler:^(BOOL success) {
 				if (success) {
 					NSLog(@"Open");
-					[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
+					[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
 				}
 			}];
 		});
@@ -153,7 +177,7 @@
 				[self.managedDocument openWithCompletionHandler:^(BOOL success) {
 					if (success) {
 					//	NSLog(@"Open");
-					//	[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
+					//	[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
 					}
 				}];
 				
@@ -176,7 +200,7 @@
 				[self.managedDocument openWithCompletionHandler:^(BOOL success) {
 					if (success) {
 						NSLog(@"Open");
-						[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyManagedDocument" object:nil userInfo:nil];
+						[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
 					}
 				}];
 //				dispatch_queue_t queue = 
@@ -205,7 +229,7 @@
 		NSLog(@"Search a file from iCloud.");
 		NSMetadataQuery *query = [[NSMetadataQuery alloc] init];
 		[query setSearchScopes:[NSArray arrayWithObject:NSMetadataQueryUbiquitousDocumentsScope]];
-		NSPredicate *pred = [NSPredicate predicateWithFormat: @"%K == %@", NSMetadataItemFSNameKey, @"text.txt"];
+		NSPredicate *pred = [NSPredicate predicateWithFormat: @"%K == %@", NSMetadataItemFSNameKey, UBIQUITOUS_TEXT_FILE_NAME];
 		[query setPredicate:pred];
 		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(queryDidFinishGatheringForDocument:) name:NSMetadataQueryDidFinishGatheringNotification object:query];
 		[query startQuery];
@@ -225,6 +249,8 @@
 	}
 }
 
+#pragma mark - Override
+
 - (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
 	if ([segue.identifier isEqualToString:@"OpenTextView"]) {
 		TextViewController *controller = segue.destinationViewController;
@@ -236,10 +262,6 @@
 	}
 }
 
-- (void)didReceiveMemoryWarning {
-    [super didReceiveMemoryWarning];
-}
-
 - (void)dealloc {
 	[self closeDocuments];
     [super dealloc];
@@ -249,8 +271,8 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-	//[self openDocument];
-	[self openManagedDocument];
+	[self openDocument];
+	//[self openManagedDocument];
 }
 
 - (void)viewDidUnload {
