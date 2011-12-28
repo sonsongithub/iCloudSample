@@ -15,6 +15,9 @@
 #import "TextViewController.h"
 #import "BookListViewController.h"
 
+#define LOCAL_TEXT_FILE_NAME		@"local_text.txt"
+#define LOCAL_DATABASE_FILE_NAME	@"local_database"
+
 @implementation LocalStorageViewController
 
 @synthesize document = _document;
@@ -32,7 +35,7 @@
 - (void)openDocument {
 	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
 	NSString *documentsDirectory = [paths objectAtIndex:0];
-	NSString *path = [NSString stringWithFormat:@"%@/text.txt", documentsDirectory];
+	NSString *path = [NSString stringWithFormat:@"%@/%@", documentsDirectory, LOCAL_TEXT_FILE_NAME];
 	
 	NSURL *URL = [NSURL fileURLWithPath:path];
 	
@@ -42,7 +45,7 @@
 		[self.document openWithCompletionHandler:^(BOOL success) {
 			if (success) {
 				NSLog(@"existing document opened from Local");
-				[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyDocument" object:self.document userInfo:nil];
+				[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyDocumentNotification object:self.document userInfo:nil];
 			} else {
 				NSLog(@"existing document failed to open from Local");
 			}
@@ -54,7 +57,7 @@
 			[self.document openWithCompletionHandler:^(BOOL success) {
 				if (success) {
 					NSLog(@"new document opened from local");
-					[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyDocument" object:self.document userInfo:nil];
+					[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyDocumentNotification object:self.document userInfo:nil];
 				}
 				else {
 				}
@@ -66,7 +69,7 @@
 - (void)openManagedDocument {
 	NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
 	NSString *documentsDirectory = [paths objectAtIndex:0];
-	NSString *path = [NSString stringWithFormat:@"%@/booklist", documentsDirectory];
+	NSString *path = [NSString stringWithFormat:@"%@/%@", documentsDirectory, LOCAL_DATABASE_FILE_NAME];
 	NSURL *docURL = [NSURL fileURLWithPath:path];
 	
 	self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:docURL] autorelease];
@@ -79,7 +82,7 @@
 	if ([[NSFileManager defaultManager] fileExistsAtPath:[docURL path]]) {
 		[self.managedDocument openWithCompletionHandler:^(BOOL success){
 			if (success) {
-				[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:@"didUpdateMyManagedDocument" object:nil];
+				[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:kDidUpdateMyManagedDocumentNotification object:nil];
 			}
 			else {
 			}
@@ -88,7 +91,7 @@
 	else {
 		[self.managedDocument saveToURL:docURL forSaveOperation:UIDocumentSaveForCreating completionHandler:^(BOOL success){
 			if (success) {
-				[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:@"didUpdateMyManagedDocument" object:nil];
+				[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:kDidUpdateMyManagedDocumentNotification object:nil];
 			}
 			else {
 			}
