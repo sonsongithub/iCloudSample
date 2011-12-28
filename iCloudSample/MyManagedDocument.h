@@ -8,6 +8,8 @@
 
 #import <UIKit/UIKit.h>
 
+extern NSString *kDidUpdateMyManagedDocumentNotification;
+
 @interface MyManagedDocument : UIManagedDocument
 
 @end

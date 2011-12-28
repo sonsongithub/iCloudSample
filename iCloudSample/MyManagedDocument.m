@@ -10,6 +10,8 @@
 
 #import <CoreData/CoreData.h>
 
+NSString *kDidUpdateMyManagedDocumentNotification = @"kDidUpdateMyManagedDocumentNotification";
+
 @implementation MyManagedDocument
 
 - (void)dealloc {

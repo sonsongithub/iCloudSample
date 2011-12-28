@@ -8,6 +8,8 @@
 
 #import "MyDocument.h"
 
+NSString *kDidUpdateMyDocumentNotification = @"kDidUpdateMyDocumentNotification";
+
 @implementation MyDocument
 
 @synthesize text = _text;
@@ -74,7 +76,7 @@
 		}
 		
 		// post message to update a view.
-		[[NSNotificationCenter defaultCenter] postNotificationName:@"didUpdateMyDocument" object:self userInfo:nil];
+		[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyDocumentNotification object:self userInfo:nil];
 	}
 }
 

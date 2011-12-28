@@ -8,6 +8,8 @@
 
 #import <UIKit/UIKit.h>
 
+extern NSString *kDidUpdateMyDocumentNotification;
+
 @interface MyDocument : UIDocument
 
 @property (nonatomic, strong) NSString *text;
