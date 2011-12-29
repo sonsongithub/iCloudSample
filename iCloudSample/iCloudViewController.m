@@ -23,6 +23,11 @@
 @synthesize document = _document;
 @synthesize managedDocument = _managedDocument;
 
+@synthesize documentQuery = _documentQuery;
+@synthesize managedDocumentQuery = _managedDocumentQuery;
+
+#pragma mark - Instance method
+
 - (void)closeDocuments {
 	[self.document closeWithCompletionHandler:^(BOOL success) {
 	}];
@@ -33,6 +38,85 @@
 	}];
 	self.managedDocument = nil; 
 }
+
+- (void)deleteFiles {
+	NSURL *URLforUIDocument = self.document.fileURL;
+	NSURL *URLforUIManagedDocument = self.managedDocument.fileURL;
+	
+	[self closeDocuments];
+	
+	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void) {
+		NSFileCoordinator* fileCoordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+		[fileCoordinator coordinateWritingItemAtURL:URLforUIDocument
+											options:NSFileCoordinatorWritingForDeleting
+											  error:nil
+										 byAccessor:^(NSURL* writingURL) {
+											 NSError *error = nil;
+											 NSFileManager* fileManager = [[NSFileManager alloc] init];
+											 [fileManager removeItemAtURL:writingURL error:&error];
+											 if (error)
+												 NSLog(@"%@", [error localizedDescription]);
+											 else
+												NSLog(@"Delete file at %@", URLforUIDocument.absoluteString);
+										 }];
+	});
+	
+	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(void) {
+		NSFileCoordinator* fileCoordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+		[fileCoordinator coordinateWritingItemAtURL:URLforUIManagedDocument
+											options:NSFileCoordinatorWritingForDeleting
+											  error:nil
+										 byAccessor:^(NSURL* writingURL) {
+											 NSError *error = nil;
+											 NSFileManager* fileManager = [[NSFileManager alloc] init];
+											 [fileManager removeItemAtURL:writingURL error:&error];
+											 if (error)
+												 NSLog(@"%@", [error localizedDescription]);
+											 else
+												 NSLog(@"Delete file at %@", URLforUIManagedDocument.absoluteString);
+										 }];
+	});
+}
+
+- (void)prepareQueryForDocument {
+	NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
+	if (ubiq) {
+		self.documentQuery = [[[NSMetadataQuery alloc] init] autorelease];
+		[self.documentQuery setSearchScopes:[NSArray arrayWithObject:NSMetadataQueryUbiquitousDocumentsScope]];
+		NSPredicate *pred = [NSPredicate predicateWithFormat: @"%K == %@", NSMetadataItemFSNameKey, UBIQUITOUS_TEXT_FILE_NAME];
+		[self.documentQuery setPredicate:pred];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+												 selector:@selector(queryDidFinishGatheringForDocument:)
+													 name:NSMetadataQueryDidFinishGatheringNotification
+												   object:self.documentQuery];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+												 selector:@selector(queryDidUpdateForDocument:)
+													 name:NSMetadataQueryDidUpdateNotification
+												   object:self.managedDocumentQuery];
+		[self.documentQuery startQuery];
+	}
+}
+
+- (void)prepareQueryForManagedDocument {
+	NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
+	if (ubiq) {
+		self.managedDocumentQuery = [[[NSMetadataQuery alloc] init] autorelease];
+		[self.managedDocumentQuery setSearchScopes:[NSArray arrayWithObject:NSMetadataQueryUbiquitousDocumentsScope]];
+		NSPredicate *pred = [NSPredicate predicateWithFormat: @"%K == %@", NSMetadataItemFSNameKey, @"DocumentMetadata.plist"];
+		[self.managedDocumentQuery setPredicate:pred];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+												 selector:@selector(queryDidFinishGatheringForManagedDocument:)
+													 name:NSMetadataQueryDidFinishGatheringNotification
+												   object:self.managedDocumentQuery];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+												 selector:@selector(queryDidUpdateForManagedDocument:)
+													 name:NSMetadataQueryDidUpdateNotification
+												   object:self.managedDocumentQuery];
+		[self.managedDocumentQuery startQuery];
+	}
+}
+
+#pragma mark - URL
 
 - (NSURL*)containerUbiquitousURL {
 	return [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
@@ -57,17 +141,23 @@
 	return ubiquitousURL;
 }
 
+- (void)createOrOpenMyDocument {
+	
+}
+
 #pragma mark - Notification handler
 
+- (void)queryDidUpdateForDocument:(NSNotification *)notification {
+}
+
 - (void)queryDidFinishGatheringForDocument:(NSNotification *)notification {
-    NSMetadataQuery *query = [notification object];
-    [query disableUpdates];
-    [query stopQuery];
+    [self.documentQuery disableUpdates];
+    [self.documentQuery stopQuery];
 	
-	if (query.resultCount == 1) {
+	if (self.documentQuery.resultCount == 1) {
 		NSLog(@"found a document from iCloud");
 		
-		NSMetadataItem *item = [query resultAtIndex:0];
+		NSMetadataItem *item = [self.documentQuery resultAtIndex:0];
         NSURL *url = [item valueForAttribute:NSMetadataItemURLKey];
         
         self.document = [[[MyDocument alloc] initWithFileURL:url] autorelease];
@@ -81,7 +171,6 @@
             }
         }];
 	}
-	
 	else {
 		NSLog(@"can't find a document from iCloud");
         NSURL *ubiquitousURL = [self documentFileUbiquitousURL];
@@ -100,21 +189,120 @@
 			}
         }];
 	}
-	[[NSNotificationCenter defaultCenter] removeObserver:self name:NSMetadataQueryDidFinishGatheringNotification object:query];
-	[query autorelease];
+	[[NSNotificationCenter defaultCenter] removeObserver:self name:NSMetadataQueryDidFinishGatheringNotification object:self.documentQuery];
+	[self.documentQuery enableUpdates];
 }
 
-- (void)queryDidFinishGatheringForManagedDocument:(NSNotification *)notification {
-    NSMetadataQuery *query = [notification object];
-    [query disableUpdates];
-    [query stopQuery];
+- (void)queryDidUpdateForManagedDocument:(NSNotification *)notification {
+	[self.managedDocumentQuery disableUpdates];
+    [self.managedDocumentQuery stopQuery];
 	
-	if (query.resultCount == 1) {
+	if (self.managedDocumentQuery.resultCount == 1) {
 		NSLog(@"Found DocumentMetadata.plist.");		
-		NSMetadataItem *item = [query resultAtIndex:0];
+		NSMetadataItem *item = [self.managedDocumentQuery resultAtIndex:0];
         NSURL *url = [item valueForAttribute:NSMetadataItemURLKey];
 		
 		NSLog(@"%@", url);
+		
+		NSNumber *downloadedKey = [item valueForAttribute:NSMetadataUbiquitousItemIsDownloadedKey];
+		NSNumber *downloadingKey = [item valueForAttribute:NSMetadataUbiquitousItemIsDownloadingKey];
+		
+		if ([downloadedKey boolValue]) {
+			NSLog(@"Already downloaded.");
+		}
+		else {
+			if ([downloadingKey boolValue]) {
+				NSLog(@"Still downloading.");
+				return;
+			}
+			else {
+				NSLog(@"Not yet.");
+				NSError *error = nil;
+				[[NSFileManager defaultManager] startDownloadingUbiquitousItemAtURL:url error:&error];
+				if (error) {
+					NSLog(@"Can't start downloading - %@", [error localizedDescription]);
+				}
+				else {
+					NSLog(@"Start downloading");
+				}
+				return;
+			}
+		}
+		
+		NSData *data = [NSData dataWithContentsOfURL:url];
+		NSString *errorDescription = nil;
+		NSPropertyListFormat format = 0;
+		NSDictionary* plist = [NSPropertyListSerialization propertyListFromData:data mutabilityOption:NSPropertyListImmutable format:&format errorDescription:&errorDescription];
+		
+		if(!plist) {
+			NSLog(@"Error: %@", errorDescription);
+			return;
+		}
+		
+		NSString *key = [plist objectForKey:@"NSPersistentStoreUbiquitousContentNameKey"];
+		NSURL *databaseFileUbiquitousURL = [url URLByDeletingLastPathComponent];
+		
+		NSLog(@"%@", key);
+		NSLog(@"%@", databaseFileUbiquitousURL);
+		
+		self.managedDocument = [[[MyManagedDocument alloc] initWithFileURL:databaseFileUbiquitousURL] autorelease];
+		
+		NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
+								 key,							NSPersistentStoreUbiquitousContentNameKey,
+								 databaseFileUbiquitousURL,		NSPersistentStoreUbiquitousContentURLKey,
+								 [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
+								 [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
+								 nil];
+		self.managedDocument.persistentStoreOptions = options;
+		dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+		
+		dispatch_async(queue, ^{
+			[self.managedDocument openWithCompletionHandler:^(BOOL success) {
+				if (success) {
+					NSLog(@"Open existing CoreData file from iCloud.");
+					[[NSNotificationCenter defaultCenter] postNotificationName:kDidUpdateMyManagedDocumentNotification object:nil userInfo:nil];
+				}
+			}];
+		});
+	}
+	[self.managedDocumentQuery enableUpdates];
+}
+
+- (void)queryDidFinishGatheringForManagedDocument:(NSNotification *)notification {
+    [self.managedDocumentQuery disableUpdates];
+    [self.managedDocumentQuery stopQuery];
+	
+	if (self.managedDocumentQuery.resultCount == 1) {
+		NSLog(@"Found DocumentMetadata.plist.");		
+		NSMetadataItem *item = [self.managedDocumentQuery resultAtIndex:0];
+        NSURL *url = [item valueForAttribute:NSMetadataItemURLKey];
+		
+		NSLog(@"%@", url);
+		
+		NSNumber *downloadedKey = [item valueForAttribute:NSMetadataUbiquitousItemIsDownloadedKey];
+		NSNumber *downloadingKey = [item valueForAttribute:NSMetadataUbiquitousItemIsDownloadingKey];
+		
+		if ([downloadedKey boolValue]) {
+			NSLog(@"Already downloaded.");
+		}
+		else {
+			if ([downloadingKey boolValue]) {
+				NSLog(@"Still downloading.");
+				return;
+			}
+			else {
+				NSLog(@"Not yet.");
+				NSError *error = nil;
+				[[NSFileManager defaultManager] startDownloadingUbiquitousItemAtURL:url error:&error];
+				if (error) {
+					NSLog(@"Can't start downloading - %@", [error localizedDescription]);
+				}
+				else {
+					NSLog(@"Start downloading");
+				}
+				return;
+			}
+		}
 		
 		NSData *data = [NSData dataWithContentsOfURL:url];
 		NSString *errorDescription = nil;
@@ -227,33 +415,18 @@
 			}];
 		});
 	}
-	[[NSNotificationCenter defaultCenter] removeObserver:self name:NSMetadataQueryDidFinishGatheringNotification object:query];
-	[query autorelease];
+	[[NSNotificationCenter defaultCenter] removeObserver:self name:NSMetadataQueryDidFinishGatheringNotification object:self.managedDocumentQuery];
+	[self.managedDocumentQuery autorelease];
 }
 
-- (void)openDocument {
-	NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
-	if (ubiq) {
-		NSLog(@"Search a file from iCloud.");
-		NSMetadataQuery *query = [[NSMetadataQuery alloc] init];
-		[query setSearchScopes:[NSArray arrayWithObject:NSMetadataQueryUbiquitousDocumentsScope]];
-		NSPredicate *pred = [NSPredicate predicateWithFormat: @"%K == %@", NSMetadataItemFSNameKey, UBIQUITOUS_TEXT_FILE_NAME];
-		[query setPredicate:pred];
-		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(queryDidFinishGatheringForDocument:) name:NSMetadataQueryDidFinishGatheringNotification object:query];
-		[query startQuery];
-	}
-}
+#pragma mark - UITableViewDelegate
 
-- (void)openManagedDocument {
-	NSURL *ubiq = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:nil];
-	if (ubiq) {
-		NSLog(@"Search a file from iCloud.");
-		NSMetadataQuery *query = [[NSMetadataQuery alloc] init];
-		[query setSearchScopes:[NSArray arrayWithObject:NSMetadataQueryUbiquitousDocumentsScope]];
-		NSPredicate *pred = [NSPredicate predicateWithFormat: @"%K == %@", NSMetadataItemFSNameKey, @"DocumentMetadata.plist"];
-		[query setPredicate:pred];
-		[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(queryDidFinishGatheringForManagedDocument:) name:NSMetadataQueryDidFinishGatheringNotification object:query];
-		[query startQuery];
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+	if (indexPath.section == 1 && indexPath.row == 0) {
+		NSLog(@"delete files on iCloud");
+		[tableView deselectRowAtIndexPath:indexPath animated:YES];
+		[self deleteFiles];
+		[self.navigationController popViewControllerAnimated:YES];
 	}
 }
 
@@ -271,20 +444,42 @@
 }
 
 - (void)dealloc {
+	self.managedDocumentQuery = nil;
+	self.documentQuery = nil;
 	[self closeDocuments];
     [super dealloc];
 }
 
 #pragma mark - View lifecycle
 
+- (void)viewWillAppear:(BOOL)animated {
+	[super viewWillAppear:animated];
+	[self.documentQuery startQuery];
+	[self.documentQuery enableUpdates];
+	[self.managedDocumentQuery startQuery];
+	[self.managedDocumentQuery enableUpdates];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+	[super viewWillDisappear:animated];
+	[self.documentQuery stopQuery];
+	[self.documentQuery disableUpdates];
+	[self.managedDocumentQuery stopQuery];
+	[self.managedDocumentQuery disableUpdates];
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-	[self openDocument];
-	[self openManagedDocument];
+	[self prepareQueryForDocument];
+	[self prepareQueryForManagedDocument];
 }
 
 - (void)viewDidUnload {
     [super viewDidUnload];
+	[self.managedDocumentQuery stopQuery];
+	self.managedDocumentQuery = nil;
+	[self.documentQuery stopQuery];
+	self.documentQuery = nil;
 	[self closeDocuments];
 }
 

@@ -17,4 +17,7 @@
 @property (strong, nonatomic) MyDocument *document;
 @property (strong, nonatomic) MyManagedDocument *managedDocument;
 
+@property (strong, nonatomic) NSMetadataQuery *documentQuery;
+@property (strong, nonatomic) NSMetadataQuery *managedDocumentQuery;
+
 @end
