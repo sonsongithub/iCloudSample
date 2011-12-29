@@ -194,6 +194,7 @@
 }
 
 - (void)queryDidUpdateForManagedDocument:(NSNotification *)notification {
+	NSLog(@"queryDidUpdateForManagedDocument:");
 	[self.managedDocumentQuery disableUpdates];
     [self.managedDocumentQuery stopQuery];
 	
@@ -269,6 +270,8 @@
 }
 
 - (void)queryDidFinishGatheringForManagedDocument:(NSNotification *)notification {
+	NSLog(@"queryDidFinishGatheringForManagedDocument:");
+	
     [self.managedDocumentQuery disableUpdates];
     [self.managedDocumentQuery stopQuery];
 	
@@ -416,7 +419,7 @@
 		});
 	}
 	[[NSNotificationCenter defaultCenter] removeObserver:self name:NSMetadataQueryDidFinishGatheringNotification object:self.managedDocumentQuery];
-	[self.managedDocumentQuery autorelease];
+	[self.managedDocumentQuery enableUpdates];
 }
 
 #pragma mark - UITableViewDelegate
