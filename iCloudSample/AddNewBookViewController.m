@@ -66,4 +66,9 @@
 	[self dismissModalViewControllerAnimated:YES];
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+	[super viewDidAppear:animated];
+	[self.bookTitleField becomeFirstResponder];
+}
+
 @end
