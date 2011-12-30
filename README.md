@@ -1,5 +1,6 @@
 iCloud Sample
 =======
+![](http://sonson.jp/wp/wp-content/uploads/2011/12/iCloudSample.png)
 
 Introduction and information
 =======
