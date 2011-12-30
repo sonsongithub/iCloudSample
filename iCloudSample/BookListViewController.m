@@ -49,7 +49,7 @@
 	if (self.managedDocument == nil)
 		return;
 	
-	NSFetchRequest *request = [[NSFetchRequest alloc] init];
+	NSFetchRequest *request = [[[NSFetchRequest alloc] init] autorelease];
 	NSEntityDescription *entity = [NSEntityDescription entityForName:@"BookInfo" inManagedObjectContext:self.managedDocument.managedObjectContext];
 	[request setEntity:entity];
 	
@@ -68,7 +68,6 @@
 		[self.array removeAllObjects];
 		[self.array addObjectsFromArray:mutableFetchResults];
 		[mutableFetchResults release];
-		[request release];
 		[self.tableView reloadData];
 	}
 }
