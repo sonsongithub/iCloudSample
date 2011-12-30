@@ -4,7 +4,10 @@ iCloud Sample
 
 Introduction and information
 =======
-To be written.
+This is a sample code for UIDocument/UIManagedDocument class. on local and iCloud storage.
+Users can edit a text file/CoreData database on local and iCloud storage with UIDocument/UIManagedDocument class.
+You have to overwrite iCloudSharing.entitlements and application identifier(like com.sonson.iCloudSharing)
+ and code signing settings.
 
 License
 =======
