@@ -4,13 +4,13 @@
 <dict>
 	<key>com.apple.developer.ubiquity-container-identifiers</key>
 	<array>
-		<string>$(TeamIdentifierPrefix)JP866VWWSD.com.sonson.iCloudSample</string>
+		<string>$(TeamIdentifierPrefix)com.sonson.iCloudSample</string>
 	</array>
 	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
-	<string>$(TeamIdentifierPrefix)JP866VWWSD.com.sonson.iCloudSample</string>
+	<string>$(TeamIdentifierPrefix)com.sonson.iCloudSample</string>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)JP866VWWSD.com.sonson.iCloudSample</string>
+		<string>$(AppIdentifierPrefix)com.sonson.iCloudSample</string>
 	</array>
 </dict>
 </plist>
