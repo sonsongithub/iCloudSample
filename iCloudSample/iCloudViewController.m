@@ -272,6 +272,18 @@
 	}
 }
 
+- (void)UIApplicationDidEnterBackgroundNotification:(NSNotification*)notification {
+	[self.managedDocumentQuery disableUpdates];
+	[self.managedDocumentQuery stopQuery];
+	[self.documentQuery disableUpdates];
+	[self.documentQuery stopQuery];
+}
+
+- (void)UIApplicationWillEnterForegroundNotification:(NSNotification*)notification {
+	[self.managedDocumentQuery startQuery];
+	[self.documentQuery startQuery];
+}
+
 #pragma mark - URL
 
 - (NSURL*)containerUbiquitousURL {
@@ -443,6 +455,9 @@
     [super viewDidLoad];
 	[self prepareQueryForDocument];
 	[self prepareQueryForManagedDocument];
+	
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(UIApplicationDidEnterBackgroundNotification:) name:UIApplicationDidEnterBackgroundNotification object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(UIApplicationWillEnterForegroundNotification:) name:UIApplicationWillEnterForegroundNotification object:nil];
 }
 
 - (void)viewDidUnload {
