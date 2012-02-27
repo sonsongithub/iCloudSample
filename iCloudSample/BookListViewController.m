@@ -102,10 +102,18 @@
 	}
 }
 
+- (void)didChangedManagedObjectContext:(NSNotification*)notification {
+	// update view according to managed object context's changes.
+	NSLog(@"name=%@", [notification name]);
+	NSLog(@"%@", [notification userInfo]);
+	[self reloadDatabase];
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
 	self.array = [NSMutableArray array];
 	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:kDidUpdateMyManagedDocumentNotification object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didChangedManagedObjectContext:) name:NSManagedObjectContextObjectsDidChangeNotification object:nil];
 	[self reloadDatabase];
 }
 
