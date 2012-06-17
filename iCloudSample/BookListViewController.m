@@ -68,6 +68,7 @@
 #pragma mark - View lifecycle
 
 - (void)reloadDatabase {
+	DNSLogMethod
 	if (self.managedDocument == nil)
 		return;
 	
@@ -83,6 +84,11 @@
 	
 	NSError *error = nil;
 	NSMutableArray *mutableFetchResults = [[self.managedDocument.managedObjectContext executeFetchRequest:request error:&error] mutableCopy];
+	
+	for (id obj in mutableFetchResults) {
+		NSLog(@"%@", obj);
+	}
+	
 	if (mutableFetchResults == nil) {
 		NSLog(@"%@", [error localizedDescription]);
 	}
@@ -95,6 +101,7 @@
 }
 
 - (void)didUpdateMyManagedDocument:(NSNotification*)notification {
+	DNSLogMethod
 	id obj = [notification object];
 	if (self.managedDocument == obj) {
 		// update
@@ -103,10 +110,19 @@
 }
 
 - (void)didChangedManagedObjectContext:(NSNotification*)notification {
-	// update view according to managed object context's changes.
+	DNSLogMethod
 	NSLog(@"name=%@", [notification name]);
 	NSLog(@"%@", [notification userInfo]);
-	[self reloadDatabase];
+}
+
+- (void)didImportUbiquitousContentChanges:(NSNotification*)notification {
+	DNSLogMethod
+	NSPersistentStoreCoordinator *coordinator = [notification object];
+	if (coordinator.managedObjectModel == self.managedDocument.managedObjectModel) {
+		NSLog(@"name=%@", [notification name]);
+		NSLog(@"%@", [notification userInfo]);
+		[self reloadDatabase];
+	}
 }
 
 - (void)viewDidLoad {
@@ -114,6 +130,7 @@
 	self.array = [NSMutableArray array];
 	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didUpdateMyManagedDocument:) name:kDidUpdateMyManagedDocumentNotification object:nil];
 	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didChangedManagedObjectContext:) name:NSManagedObjectContextObjectsDidChangeNotification object:nil];
+	[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didImportUbiquitousContentChanges:) name:NSPersistentStoreDidImportUbiquitousContentChangesNotification object:nil];
 	[self reloadDatabase];
 }
 
